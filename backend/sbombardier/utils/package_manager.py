@@ -143,51 +143,97 @@ class PackageManagerResolver:
             raise RuntimeError(f"Failed to resolve npm dependencies: {e.stderr}")
             
     def _resolve_maven_dependencies(self) -> List[DependencyInfo]:
-        """Resolve Maven dependencies.
-        
-        Returns:
-            List[DependencyInfo]: List of resolved Maven dependencies
-        """
+    """Resolve Maven dependencies using proper DOT parsing."""
         try:
-            # Use Maven dependency plugin to list dependencies
+            # Generate dependency tree
+            deps_file = self.project_path / "deps.txt"
             cmd = [
                 "mvn",
                 "dependency:tree",
                 "-DoutputType=dot",
-                "-DoutputFile=deps.txt"
+                f"-DoutputFile={deps_file}"
             ]
             subprocess.run(cmd, cwd=self.project_path, check=True)
-            
-            # Parse dependency tree from generated file
-            deps_file = self.project_path / "deps.txt"
+
             dependencies = []
-            
             if deps_file.exists():
-                # Parse DOT format dependency tree
-                # This is a simplified parser - in practice you'd want to use a proper DOT parser
-                with open(deps_file) as f:
-                    for line in f:
-                        if "->" in line:
-                            # Parse dependency relationship
-                            src, dst = line.split("->")
-                            src = src.strip().strip('"')
-                            dst = dst.strip().strip('"')
-                            
-                            # Extract name and version
-                            src_parts = src.split(":")
-                            if len(src_parts) >= 2:
-                                dependencies.append(DependencyInfo(
-                                    name=src_parts[1],
-                                    version=src_parts.get(3, ""),
-                                    dependencies=[]
-                                ))
-                                
-                deps_file.unlink()  # Clean up
+                from pyparsing import Word, alphas, alphanums, QuotedString, Suppress, OneOrMore
                 
+                # Define DOT grammar
+                node_id = Word(alphas, alphanums + "_.")
+                attr = Suppress("=") + QuotedString('"')
+                node_stmt = node_id + Suppress("[") + OneOrMore(attr) + Suppress("]")
+                edge_stmt = Suppress("->")
+                graph_parser = (OneOrMore(node_stmt | edge_stmt))
+
+                # Parse the DOT file
+                with open(deps_file) as f:
+                    dot_content = f.read()
+                    parsed = graph_parser.parseString(dot_content)
+
+                # Build dependency graph
+                nodes = {}
+                edges = []
+                current_node = None
+                for item in parsed:
+                    if isinstance(item, str) and item == "->":
+                        edges.append((current_node, None))
+                    elif isinstance(item, str) and current_node:
+                        edges.append((current_node, item))
+                        current_node = None
+                    else:
+                        parts = list(item)
+                        node_name = parts[0]
+                        attributes = {k: v for k, v in zip(parts[1::2], parts[2::2])}
+                        nodes[node_name] = attributes
+                        current_node = node_name
+
+                # Process Maven coordinates
+                def parse_maven_coords(node_id: str) -> dict:
+                    parts = node_id.split(":")
+                    if len(parts) >= 4:
+                        return {
+                            "group": parts[0],
+                            "artifact": parts[1],
+                            "type": parts[2],
+                            "version": parts[3],
+                            "scope": parts[4] if len(parts) > 4 else "compile"
+                        }
+                    return None
+
+                # Build dependency hierarchy
+                dep_map = {}
+                for node_id, attrs in nodes.items():
+                    coords = parse_maven_coords(attrs.get("label", node_id))
+                    if not coords:
+                        continue
+                    
+                    dep = DependencyInfo(
+                        name=f"{coords['group']}:{coords['artifact']}",
+                        version=coords['version'],
+                        dependencies=[],
+                        dev_dependency=coords['scope'] in ["test", "provided"]
+                    )
+                    dep_map[node_id] = dep
+
+                # Add dependencies based on edges
+                for source, target in edges:
+                    if source in dep_map and target in dep_map:
+                        dep_map[source].dependencies.append(dep_map[target])
+
+                # Find root dependencies (those not appearing as targets)
+                all_targets = {target for _, target in edges}
+                dependencies = [dep for node_id, dep in dep_map.items() 
+                            if node_id not in all_targets]
+
+                deps_file.unlink()  # Clean up
+
             return dependencies
-            
+
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Failed to resolve Maven dependencies: {e.stderr}")
+        except ImportError:
+            raise RuntimeError("DOT parsing requires pyparsing package. Install with: pip install pyparsing")
             
     def _resolve_gradle_dependencies(self) -> List[DependencyInfo]:
         """Resolve Gradle dependencies.
