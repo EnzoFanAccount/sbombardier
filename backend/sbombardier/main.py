@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from sbombardier.core.sbom_generator import SBOMFormat, SBOMGenerator
+from sbombardier.risk.predictor import ComponentRisk, RiskPredictor
 from sbombardier.validators.sbom_validator import ValidationResult, ValidationStandard, SBOMValidator
 
 app = FastAPI(
@@ -36,6 +37,16 @@ class ValidationRequest(BaseModel):
     """Request model for SBOM validation."""
     standard: ValidationStandard = ValidationStandard.NTIA
     sbom_content: str
+
+class RiskPredictionRequest(BaseModel):
+    """Request model for risk prediction."""
+    name: str
+    version: str
+    license_id: str
+    repo_url: Optional[str] = None
+
+# Initialize services
+risk_predictor = RiskPredictor()
 
 @app.post("/generate", response_model=Dict[str, Union[str, List[str]]])
 async def generate_sbom(request: GenerateRequest):
@@ -72,6 +83,27 @@ async def validate_sbom(request: ValidationRequest):
         validator = SBOMValidator(request.standard)
         result = validator.validate(request.sbom_content)
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/predict-risk", response_model=ComponentRisk)
+async def predict_risk(request: RiskPredictionRequest):
+    """Predict risk for a component.
+    
+    Args:
+        request: Risk prediction request
+        
+    Returns:
+        ComponentRisk containing risk assessment
+    """
+    try:
+        risk = risk_predictor.predict_component_risk(
+            name=request.name,
+            version=request.version,
+            license_id=request.license_id,
+            repo_url=request.repo_url
+        )
+        return risk
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
