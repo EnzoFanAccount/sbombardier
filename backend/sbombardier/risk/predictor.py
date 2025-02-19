@@ -17,6 +17,10 @@ from trustyai.model import ModelAnalyzer
 import networkx as nx
 from packaging.version import parse as parse_version
 from packaging.specifiers import SpecifierSet
+from packaging.requirements import Requirement
+import pkg_resources
+import subprocess
+import tempfile
 
 from ..ml.data.collectors import (LicenseCollector, MaintainerCollector,
                                VulnerabilityCollector)
@@ -317,23 +321,68 @@ class RiskPredictor:
             if cached:
                 return {k: SpecifierSet(v) for k,v in json.loads(cached).items()}
         
-        # Get dependencies from package manager API
-        try:
-            # TODO: Implement package manager specific logic
-            # For now return empty dict
-            deps = {}
-            
-            # Cache result
-            if self.redis:
-                self.redis.setex(
-                    cache_key,
-                    3600,  # 1 hour TTL
-                    json.dumps({k: str(v) for k,v in deps.items()})
-                )
-            
-            return deps
-        except:
-            return {}
+        # Create a temporary environment to resolve dependencies
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                # Create requirements file
+                req_file = Path(temp_dir) / "requirements.txt"
+                with open(req_file, "w") as f:
+                    f.write(f"{name}=={version}\n")
+                
+                # Use pip to download package and its dependencies
+                subprocess.run([
+                    "pip", "download",
+                    "--no-deps",
+                    "-r", str(req_file),
+                    "--dest", temp_dir
+                ], check=True, capture_output=True)
+                
+                # Find the downloaded package
+                wheel_files = list(Path(temp_dir).glob("*.whl"))
+                sdist_files = list(Path(temp_dir).glob("*.tar.gz"))
+                pkg_file = wheel_files[0] if wheel_files else sdist_files[0]
+                
+                # Extract metadata using pkg_resources
+                if wheel_files:
+                    dist = pkg_resources.Distribution.from_location(
+                        str(pkg_file),
+                        str(pkg_file)
+                    )
+                else:
+                    # For source distributions, install in temp env to get metadata
+                    subprocess.run([
+                        "pip", "install",
+                        "--no-deps",
+                        str(pkg_file),
+                        "--target", temp_dir
+                    ], check=True, capture_output=True)
+                    
+                    dist = pkg_resources.Distribution.from_filename(str(pkg_file))
+                
+                # Get dependencies from metadata
+                deps = {}
+                if dist.has_metadata('requires.txt'):
+                    for req_line in dist.get_metadata_lines('requires.txt'):
+                        try:
+                            # Parse requirement
+                            req = Requirement(req_line)
+                            deps[req.name] = req.specifier
+                        except:
+                            continue
+                            
+                # Cache result
+                if self.redis:
+                    self.redis.setex(
+                        cache_key,
+                        3600,  # 1 hour TTL
+                        json.dumps({k: str(v) for k,v in deps.items()})
+                    )
+                
+                return deps
+                
+            except Exception as e:
+                print(f"Error getting dependencies for {name}=={version}: {e}")
+                return {}
 
     def _resolve_version(self, name: str, spec: SpecifierSet) -> str:
         """Resolve best matching version for a dependency.
@@ -345,9 +394,32 @@ class RiskPredictor:
         Returns:
             str: Best matching version
         """
-        # TODO: Implement version resolution logic
-        # For now return a dummy version
-        return "0.1.0"
+        try:
+            # Get all available versions from PyPI
+            cmd = ["pip", "index", "versions", name]
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            
+            # Parse versions from output
+            versions = []
+            for line in result.stdout.splitlines():
+                if line.strip().startswith(name):
+                    ver_str = line.split()[-1]
+                    try:
+                        version = parse_version(ver_str)
+                        if spec.contains(version):
+                            versions.append(version)
+                    except:
+                        continue
+            
+            if not versions:
+                return "0.1.0"  # Fallback if no matching version found
+            
+            # Return highest matching version
+            return str(max(versions))
+            
+        except Exception as e:
+            print(f"Error resolving version for {name} {spec}: {e}")
+            return "0.1.0"  # Fallback version
         
     def _convert_code_to_image(self, name: str, version: str) -> torch.Tensor:
         """Convert code to grayscale image for CNN model.
