@@ -14,6 +14,9 @@ import redis
 import torch
 from giskard import Model, ModelValidator
 from trustyai.model import ModelAnalyzer
+import networkx as nx
+from packaging.version import parse as parse_version
+from packaging.specifiers import SpecifierSet
 
 from ..ml.data.collectors import (LicenseCollector, MaintainerCollector,
                                VulnerabilityCollector)
@@ -199,19 +202,152 @@ class RiskPredictor:
             version: Component version
             
         Returns:
-            dgl.DGLGraph: Dependency graph
+            dgl.DGLGraph: Dependency graph representing package dependencies
         """
-        # TODO: Implement proper graph construction
-        # This is a placeholder that creates a simple graph
-        num_nodes = 10
-        src = torch.randint(0, num_nodes, (20,))
-        dst = torch.randint(0, num_nodes, (20,))
-        g = dgl.graph((src, dst))
+        # Create NetworkX graph for initial construction
+        G = nx.DiGraph()
         
-        # Add random node features
-        g.ndata["feat"] = torch.randn(num_nodes, 64)
+        def add_dependencies(pkg_name: str, pkg_version: str, depth: int = 0):
+            if depth > 5:  # Limit depth to prevent infinite recursion
+                return
+            
+            # Add current package as node
+            node_id = f"{pkg_name}@{pkg_version}"
+            if node_id not in G.nodes:
+                G.add_node(node_id, 
+                          name=pkg_name,
+                          version=pkg_version,
+                          depth=depth)
+            
+            try:
+                # Get package dependencies
+                deps = self._get_package_dependencies(pkg_name, pkg_version)
+                
+                # Add edges for each dependency
+                for dep_name, dep_spec in deps.items():
+                    try:
+                        # Get best matching version for dependency
+                        dep_version = self._resolve_version(dep_name, dep_spec)
+                        dep_id = f"{dep_name}@{dep_version}"
+                        
+                        # Add edge
+                        G.add_edge(node_id, dep_id, 
+                                 requirement=str(dep_spec))
+                        
+                        # Recursively add dependencies
+                        add_dependencies(dep_name, dep_version, depth + 1)
+                    except Exception as e:
+                        # Log error but continue with other dependencies
+                        print(f"Error adding dependency {dep_name}: {e}")
+                        
+            except Exception as e:
+                print(f"Error getting dependencies for {pkg_name}: {e}")
         
-        return g
+        # Start graph construction from root package
+        add_dependencies(name, version)
+        
+        # Convert NetworkX graph to DGL
+        dgl_graph = dgl.from_networkx(G, 
+            node_attrs=['name', 'version', 'depth'],
+            edge_attrs=['requirement'])
+        
+        # Add node features
+        num_nodes = dgl_graph.num_nodes()
+        
+        # Node feature vector components:
+        # [0-31]: Name embedding (hashed)
+        # [32-47]: Version embedding
+        # [48-55]: Depth encoding
+        # [56-63]: Degree features
+        node_features = torch.zeros((num_nodes, 64))
+        
+        for i, (name, version, depth) in enumerate(zip(
+            dgl_graph.ndata['name'],
+            dgl_graph.ndata['version'],
+            dgl_graph.ndata['depth']
+        )):
+            # Hash package name into 32-dim vector
+            name_hash = hash(name) % (2**32)
+            for j in range(32):
+                node_features[i,j] = (name_hash >> j) & 1
+            
+            # Encode version into 16-dim vector
+            try:
+                v = parse_version(version)
+                node_features[i,32:40] = torch.tensor([
+                    v.major if hasattr(v, 'major') else 0,
+                    v.minor if hasattr(v, 'minor') else 0,
+                    v.micro if hasattr(v, 'micro') else 0,
+                    v.pre[1] if v.pre else 0,
+                    v.post[1] if v.post else 0,
+                    v.dev[1] if v.dev else 0,
+                    v.local[0] if v.local else 0,
+                    1 if v.is_prerelease else 0
+                ]) / 100.0  # Normalize
+            except:
+                pass
+            
+            # Encode depth
+            node_features[i,48:56] = torch.tensor([depth]) / 5.0
+            
+            # Add degree features
+            in_deg = dgl_graph.in_degrees(i).float()
+            out_deg = dgl_graph.out_degrees(i).float()
+            node_features[i,56:60] = in_deg / 10.0  # Normalize
+            node_features[i,60:64] = out_deg / 10.0
+        
+        dgl_graph.ndata['feat'] = node_features
+        
+        return dgl_graph
+
+    def _get_package_dependencies(self, name: str, version: str) -> Dict[str, SpecifierSet]:
+        """Get dependencies for a package version.
+        
+        Args:
+            name: Package name
+            version: Package version
+            
+        Returns:
+            Dict mapping dependency names to version specifiers
+        """
+        # Try to get from cache first
+        cache_key = f"deps:{name}:{version}"
+        if self.redis:
+            cached = self.redis.get(cache_key)
+            if cached:
+                return {k: SpecifierSet(v) for k,v in json.loads(cached).items()}
+        
+        # Get dependencies from package manager API
+        try:
+            # TODO: Implement package manager specific logic
+            # For now return empty dict
+            deps = {}
+            
+            # Cache result
+            if self.redis:
+                self.redis.setex(
+                    cache_key,
+                    3600,  # 1 hour TTL
+                    json.dumps({k: str(v) for k,v in deps.items()})
+                )
+            
+            return deps
+        except:
+            return {}
+
+    def _resolve_version(self, name: str, spec: SpecifierSet) -> str:
+        """Resolve best matching version for a dependency.
+        
+        Args:
+            name: Package name
+            spec: Version specifier
+            
+        Returns:
+            str: Best matching version
+        """
+        # TODO: Implement version resolution logic
+        # For now return a dummy version
+        return "0.1.0"
         
     def _convert_code_to_image(self, name: str, version: str) -> torch.Tensor:
         """Convert code to grayscale image for CNN model.
