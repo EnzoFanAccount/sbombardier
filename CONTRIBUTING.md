@@ -4,7 +4,7 @@ First off, thank you for considering contributing to SBOMbardier! It's people li
 
 ## Code of Conduct
 
-By participating in this project, you are expected to uphold our Code of Conduct. Please report unacceptable behavior to [project maintainers].
+By participating in this project, you are expected to uphold our [Code of Conduct](CODE_OF_CONDUCT.md). Please report unacceptable behavior to enzobiondo11@outlook.com.
 
 ## How Can I Contribute?
 
@@ -15,6 +15,7 @@ We're currently focusing on:
 2. Frontend development
 3. General testing and usage feedback
 4. Documentation improvements
+5. Policy rule contributions for different compliance frameworks
 
 ### Reporting Bugs
 

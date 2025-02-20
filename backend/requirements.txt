@@ -34,3 +34,15 @@ graphviz>=0.20.1  # For dependency visualization
 pygments>=2.15.0
 python-magic>=0.4.27
 osv>=0.7.0
+
+# Compliance Workflow Dependencies
+jinja2>=3.1.0  # For report templating
+aiofiles>=23.2.1  # Async file operations
+python-gitlab>=4.0.0  # GitLab API client
+PyGithub>=2.1.0  # GitHub API client
+opa-python>=1.2.0  # Open Policy Agent SDK
+sigstore>=2.0.0  # For SBOM signing
+in-toto>=2.0.0  # Supply chain security
+python-keycloak>=3.0.0  # Auth integration
+prometheus-client>=0.19.0  # Metrics
+python-jenkins>=1.8.0  # Jenkins integration

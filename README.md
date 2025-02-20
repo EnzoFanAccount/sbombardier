@@ -1,4 +1,4 @@
-![alt text](https://github.com/EnzoFanAccount/SBOMbardier/blob/main/SBOMbardier.png?raw=true)
+![alt text](https://github.com/EnzoFanAccount/sbombardier/blob/main/SBOMbardier.png?raw=true)
 
 
 [![Project Status: WIP](https://img.shields.io/badge/status-early_development-orange)](https://github.com/yourorg/sbombardier)
@@ -9,7 +9,7 @@ An open-source, community-driven, AI-powered tool to automate Software Bill of M
 
 > **Early Stage Notice**: SBOMbardier is currently in active early development. We welcome contributors and early adopters to help shape its future! We are in need of testers to ensure the tool's functionality!
 
-## Current Core Capabilities (v0.1.1-alpha)
+## Current Core Capabilities (v0.2.0-alpha)
 
 **SBOM Generation & Validation**
 - Supports both SPDX and CycloneDX formats
@@ -34,6 +34,24 @@ An open-source, community-driven, AI-powered tool to automate Software Bill of M
 - License conflict detection using SPDX compatibility matrix
 - Code-to-image conversion pipeline for ML analysis (64x64 grayscale syntax/AST images)
 
+**Compliance Workflow Automation**
+- CI/CD Pipeline Integration:
+  - GitHub Actions integration with automated compliance checks
+  - GitLab CI/CD pipeline support
+  - Jenkins pipeline integration
+- Policy Enforcement:
+  - Open Policy Agent (OPA) integration for flexible policy management
+  - Pre-built policies for GDPR, CCPA, and DORA compliance
+  - Custom policy support using Rego language
+- Audit Trail & Evidence Collection:
+  - Automated audit logging with cryptographic evidence
+  - SBOM signing using Sigstore
+  - Chain of custody tracking
+- Compliance Reporting:
+  - Automated report generation for various frameworks
+  - Customizable report templates
+  - Evidence-based compliance documentation
+
 **Platform Foundations**
 - FastAPI backend with Redis caching and PostgreSQL storage
 - Placeholder Frontend
@@ -47,13 +65,14 @@ An open-source, community-driven, AI-powered tool to automate Software Bill of M
 - Node.js 18+ (Frontend)
 - Docker 24+ (Container deployment)
 - Syft 1.0+ and Trivy 0.50+ (SBOM generation)
+- Open Policy Agent (OPA) 0.50+ (Policy enforcement)
 
 ### Backend Setup
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/EnzoFanAccount/SBOMbardier.git
-cd SBOMbardier
+git clone https://github.com/EnzoFanAccount/sbombardier.git
+cd sbombardier
 ```
 2. Install Python dependencies
 ```bash
@@ -63,6 +82,7 @@ pip install -r requirements.txt
 3. Install external tools:
 - [Syft](https://github.com/anchore/syft#installation)
 - [Trivy](https://aquasecurity.github.io/trivy/latest/getting-started/installation/)
+- [Open Policy Agent](https://www.openpolicyagent.org/docs/latest/#1-download-opa)
 
 ### Frontend Setup
 
@@ -117,6 +137,7 @@ Content-Type: application/json
 ```http
 POST /predict-risk
 Content-Type: application/json
+
 {
     "name": "package-name",
     "version": "1.0.0",
@@ -124,6 +145,37 @@ Content-Type: application/json
     "repo_url": "https://github.com/org/repo" // optional
 }
 ```
+
+#### Generate Compliance Report
+```http
+POST /compliance/report
+Content-Type: application/json
+
+{
+    "project_id": "your-project-id",
+    "framework": "gdpr", // or "ccpa", "dora"
+    "start_date": "2024-01-01", // optional
+    "end_date": "2024-02-01" // optional
+}
+```
+
+#### Validate CI Pipeline
+```http
+POST /compliance/validate-pipeline
+Content-Type: application/json
+
+{
+    "project_data": {
+        "name": "your-project",
+        "license": "MIT"
+    },
+    "sbom_data": {
+        // SBOM content
+    },
+    "ci_platform": "github" // or "gitlab"
+}
+```
+
 ### Docker Deployment
 
 1. Build the containers:
@@ -147,8 +199,9 @@ The application will be available at `http://localhost:8000` (API) and `http://l
 - [ ] Confidence Calibration on Risk Models
 
 ### Phase 2: Compliance Workflow Automation | Cross-Platform Ecosystem
-- [ ] CI/CD Integration
-- [ ] Audit and Reporting
+- [x] CI/CD Integration
+- [x] Audit and Reporting
+- [x] Policy Enforcement
 - [ ] Cloud/GRC Integrations
 - [ ] IDE Plugins
 
@@ -168,6 +221,7 @@ We urgently need help with:
 - Improving ML model accuracy and confidence calibration
 - Frontend
 - General Testing and Usage
+- Policy rule contributions for different compliance frameworks
 
 See our [Contributor Guide](CONTRIBUTING.md) for:
 - Good first issues
@@ -183,3 +237,4 @@ AGPL-3.0 - See [LICENSE](LICENSE) for details
 > - Documentation gaps
 > - Model performance concerns
 > - Errors
+> - Policy rule suggestions
