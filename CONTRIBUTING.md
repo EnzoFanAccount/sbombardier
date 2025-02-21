@@ -4,7 +4,7 @@ First off, thank you for considering contributing to SBOMbardier! It's people li
 
 ## Code of Conduct
 
-By participating in this project, you are expected to uphold our [Code of Conduct](CODE_OF_CONDUCT.md). Please report unacceptable behavior to enzobiondo11@outlook.com.
+By participating in this project, you are expected to uphold our [Code of Conduct](CODE_OF_CONDUCT.md). Please report unacceptable behavior to sbmbrdr@protonmail.com.
 
 ## How Can I Contribute?
 
