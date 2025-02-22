@@ -680,21 +680,26 @@ tests = ["pytest", "pytest-cov", "pytest-xdist"]
 
 [[package]]
 name = "cyclonedx-python-lib"
-version = "4.2.3"
-description = "A library for producing CycloneDX SBOM (Software Bill of Materials) files."
+version = "5.2.0"
+description = "Python library for CycloneDX"
 optional = false
-python-versions = ">=3.7,<4.0"
+python-versions = ">=3.8,<4.0"
 groups = ["main"]
 files = [
-    {file = "cyclonedx_python_lib-4.2.3-py3-none-any.whl", hash = "sha256:e9b923af525b6acf7bab917a35360b4b562b85dc15fde9eaa500828949adf73a"},
-    {file = "cyclonedx_python_lib-4.2.3.tar.gz", hash = "sha256:904068b55d1665f0ea96f38307603cc14f95c3b421f1687fc2411326aefde3a6"},
+    {file = "cyclonedx_python_lib-5.2.0-py3-none-any.whl", hash = "sha256:1b43065205cdc53490c825fcfbda73142b758aa40ca169c968e342e88d06734f"},
+    {file = "cyclonedx_python_lib-5.2.0.tar.gz", hash = "sha256:b9ebf2c0520721d2f8ee16aadc2bbb9d4e015862c84ab1691a49b177f3014d99"},
 ]
 
 [package.dependencies]
 license-expression = ">=30,<31"
 packageurl-python = ">=0.11"
-py-serializable = ">=0.11.1,<0.12.0"
+py-serializable = ">=0.15,<0.16"
 sortedcontainers = ">=2.4.0,<3.0.0"
+
+[package.extras]
+json-validation = ["jsonschema[format] (>=4.18,<5.0)"]
+validation = ["jsonschema[format] (>=4.18,<5.0)", "lxml (>=4,<5)"]
+xml-validation = ["lxml (>=4,<5)"]
 
 [[package]]
 name = "databricks-sdk"
@@ -3851,14 +3856,14 @@ tests = ["pytest"]
 
 [[package]]
 name = "py-serializable"
-version = "0.11.1"
+version = "0.15.0"
 description = "Library for serializing and deserializing Python Objects to and from JSON and XML."
 optional = false
 python-versions = ">=3.7,<4.0"
 groups = ["main"]
 files = [
-    {file = "py-serializable-0.11.1.tar.gz", hash = "sha256:ba0e1287b9e4f645a5334f1913abd8e647e7250209f84f55dce3909498a6f586"},
-    {file = "py_serializable-0.11.1-py3-none-any.whl", hash = "sha256:79e21f0672822e6200b15f45ce9f636e8126466f62dbd7d488c67313c72b5c3e"},
+    {file = "py-serializable-0.15.0.tar.gz", hash = "sha256:8fc41457d8ee5f5c5a12f41fd87bf1a4f2ecf9da39fee92059b728e78f320771"},
+    {file = "py_serializable-0.15.0-py3-none-any.whl", hash = "sha256:d3f1201b33420c481aa83f7860c7bf2c2f036ba3ea82b6e15a96696457c36cd2"},
 ]
 
 [package.dependencies]
@@ -6548,4 +6553,4 @@ ml = ["dgl", "giskard", "graphviz", "numpy", "nvdlib", "openai", "osv", "pandas"
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.10"
-content-hash = "e0e329b2d72512bb291362c12013e8081f9fb0023308b59505b5d2ab4158af68"
+content-hash = "2cda1a82efbaf9dc3cc9640b996f19b087a5689253064aca357fa5c65c0080e8"
