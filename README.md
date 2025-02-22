@@ -1,11 +1,13 @@
-![alt text](https://github.com/EnzoFanAccount/sbombardier/blob/main/SBOMbardier.png?raw=true)
+<p align="center">
+  <img src="https://github.com/EnzoFanAccount/sbombardier/blob/main/SBOMbardier.png?raw=true" alt="Project Logo" width="800">
+</p>
 
+<h1 align="center">An open-source, community-driven, AI-powered tool to automate Software Bill of Materials (SBOM) validation, license compliance, and vulnerability detection for open-source dependencies.</h1>
 
 [![Project Status: WIP](https://img.shields.io/badge/status-early_development-orange)](https://github.com/yourorg/sbombardier)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPLv3-blue.svg)](https://opensource.org/license/agpl-v3)
 [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-An open-source, community-driven, AI-powered tool to automate Software Bill of Materials (SBOM) validation, license compliance, and vulnerability detection for open-source dependencies.
 
 > **Early Stage Notice**: SBOMbardier is currently in active early development. We welcome contributors and early adopters to help shape its future! We are in need of testers to ensure the tool's functionality!
 
