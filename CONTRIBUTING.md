@@ -53,10 +53,15 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 1. Set up Python environment:
 ```bash
-python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+# Install Poetry (if not already installed)
+pip install poetry
+
+# Install dependencies
 cd backend
-pip install -r requirements.txt
+poetry install --extras "ml compliance"  # Install all dependencies for development
+
+# Activate virtual environment
+poetry shell
 ```
 
 2. Install external tools:
@@ -65,7 +70,7 @@ pip install -r requirements.txt
 
 3. Run tests:
 ```bash
-pytest
+poetry run pytest
 ```
 
 ### Frontend Development

@@ -64,6 +64,7 @@
 
 ### Prerequisites
 - Python 3.10 only (Due to TensorFlow) (Backend)
+- Poetry (Python dependency management)
 - Node.js 18+ (Frontend)
 - Docker 24+ (Container deployment)
 - Syft 1.0+ and Trivy 0.50+ (SBOM generation)
@@ -76,12 +77,29 @@
 git clone https://github.com/EnzoFanAccount/sbombardier.git
 cd sbombardier
 ```
-2. Install Python dependencies
+
+2. Install Poetry (if not already installed):
+```bash
+pip install poetry
+```
+
+3. Install Python dependencies:
 ```bash
 cd backend
-pip install -r requirements.txt
+# Install core dependencies only
+poetry install
+
+# Install with ML support
+poetry install --extras ml
+
+# Install with compliance features
+poetry install --extras compliance
+
+# Install all optional dependencies
+poetry install --extras "ml compliance"
 ```
-3. Install external tools:
+
+4. Install external tools:
 - [Syft](https://github.com/anchore/syft#installation)
 - [Trivy](https://aquasecurity.github.io/trivy/latest/getting-started/installation/)
 - [Open Policy Agent](https://www.openpolicyagent.org/docs/latest/#1-download-opa)

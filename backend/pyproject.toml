@@ -1,0 +1,108 @@
+[tool.poetry]
+name = "sbombardier"
+version = "0.2.0-alpha"
+description = "AI-powered SBOM validation, license compliance, and vulnerability detection tool"
+authors = ["EnzoFanAccount"]
+license = "AGPL-3.0"
+readme = "README.md"
+packages = [{include = "sbombardier"}]
+
+[tool.poetry.dependencies]
+python = "~3.10"  # Specific to 3.10 due to TensorFlow compatibility
+fastapi = "^0.104.0"
+uvicorn = "^0.24.0"
+pydantic = "^2.4.2"
+python-multipart = "^0.0.6"
+requests = "^2.31.0"
+cyclonedx-python-lib = "^5.0.0"
+packageurl-python = "^0.11.1"
+spdx-tools = "^0.8.0"
+redis = "^5.0.1"
+psycopg2-binary = "^2.9.9"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+aiofiles = "^23.2.1"
+python-dotenv = "^1.0.0"
+pyparsing = "^3.1.0"
+packaging = "<22.0"
+
+# ML Dependencies - in optional group
+torch = {version = "^2.1.0", optional = true}
+transformers = {version = "^4.36.0", optional = true}
+dgl = {version = "*", optional = true}  # Latest compatible version
+scikit-learn = {version = "^1.3.0", optional = true}
+numpy = {version = "^1.24.0", optional = true}
+pandas = {version = "^1.5.3", optional = true}
+tensorflow = {version = "2.10.0", optional = true}
+tensorflow-hub = {version = "^0.15.0", optional = true}
+tensorflow-text = {version = "^2.10.0", optional = true}
+giskard = {version = "^2.9.0", optional = true}
+trustyai = {version = "^0.6.1", optional = true}
+nvdlib = {version = "^0.7.0", optional = true}
+osv = { version = "^0.0.21", extras = ["python"], optional = true }
+openai = {version = "^1.0.0", optional = true}
+graphviz = {version = "^0.20.1", optional = true}
+pygments = {version = "^2.15.0", optional = true}
+python-magic = {version = "^0.4.27", optional = true}
+
+# Compliance Dependencies - in optional group
+jinja2 = {version = "^3.1.0", optional = true}
+python-gitlab = {version = "^4.0.0", optional = true}
+PyGithub = {version = "^2.1.0", optional = true}
+opa-python = {version = "^0.0.8", optional = true}
+sigstore = {version = "^2.0.0", optional = true}
+in-toto = {version = "^2.0.0", optional = true}
+python-keycloak = {version = "^3.0.0", optional = true}
+prometheus-client = {version = "^0.19.0", optional = true}
+python-jenkins = {version = "^1.8.0", optional = true}
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+black = { version = "^22.3.0", python = "^3.10" }
+isort = "^5.12.0"
+flake8 = "^6.1.0"
+mypy = "^1.5.1"
+
+[tool.poetry.extras]
+ml = [
+    "torch",
+    "transformers",
+    "dgl",
+    "scikit-learn",
+    "numpy",
+    "pandas",
+    "tensorflow",
+    "tensorflow-hub",
+    "tensorflow-text",
+    "giskard",
+    "trustyai",
+    "nvdlib",
+    "osv",
+    "openai",
+    "graphviz",
+    "pygments",
+    "python-magic"
+]
+compliance = [
+    "jinja2",
+    "python-gitlab",
+    "PyGithub",
+    "opa-python",
+    "sigstore",
+    "in-toto",
+    "python-keycloak",
+    "prometheus-client",
+    "python-jenkins"
+]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3 
