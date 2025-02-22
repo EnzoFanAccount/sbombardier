@@ -61,7 +61,7 @@ An open-source, community-driven, AI-powered tool to automate Software Bill of M
 ## Installation
 
 ### Prerequisites
-- Python 3.10+ (Backend)
+- Python 3.10 only (Due to TensorFlow) (Backend)
 - Node.js 18+ (Frontend)
 - Docker 24+ (Container deployment)
 - Syft 1.0+ and Trivy 0.50+ (SBOM generation)
