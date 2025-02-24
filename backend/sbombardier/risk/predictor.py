@@ -45,13 +45,15 @@ class RiskPredictor:
     def __init__(self, 
                 model_type: ModelType = ModelType.HYBRID,
                 redis_url: Optional[str] = None,
-                model_path: Optional[str] = None):
+                model_path: Optional[str] = None,
+                use_ml: bool = True):
         """Initialize risk predictor.
         
         Args:
             model_type: Type of ML model to use
             redis_url: Redis URL for caching
             model_path: Path to pre-trained model
+            use_ml: Whether to use ML features
         """
         self.model_type = model_type
         self.model = HybridRiskPredictor()
@@ -67,6 +69,20 @@ class RiskPredictor:
         # Initialize AI validation frameworks
         self.validator = ModelValidator()
         self.analyzer = ModelAnalyzer()
+        
+        self.use_ml = use_ml
+        if use_ml:
+            self._verify_tensorflow()
+        
+    def _verify_tensorflow(self):
+        try:
+            import tensorflow as tf
+        except ImportError:
+            raise RuntimeError(
+                "ML features require TensorFlow. Install with:\n"
+                "poetry install --extras ml\n"
+                "Windows users: poetry run pip install tensorflow==2.10.0"
+            )
         
     def predict_component_risk(self, 
                             name: str,

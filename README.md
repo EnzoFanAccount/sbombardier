@@ -98,6 +98,12 @@ poetry install --extras compliance
 # Install all optional dependencies
 poetry install --extras "ml compliance"
 ```
+### Windows-specific Additional Step
+```bash
+poetry run pip install tensorflow==2.10.0
+```
+
+This separation is necessary because TensorFlow's Windows wheels require special handling.
 
 4. Install external tools:
 - [Syft](https://github.com/anchore/syft#installation)

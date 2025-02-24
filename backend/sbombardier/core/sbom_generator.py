@@ -5,9 +5,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
-from cyclonedx.model import (Bom, BomMetadata, Component, ExternalReference,
-                          ExternalReferenceType, Tool)
-from cyclonedx.output import get_instance as get_cyclonedx_output
+from cyclonedx.model.bom import Bom
+from cyclonedx.model.component import Component, ComponentType
+from cyclonedx.model.license import License, LicenseChoice
+from cyclonedx.model.organizational_entity import OrganizationalEntity
+from cyclonedx.output import OutputFormat, get_instance
 from packageurl import PackageURL
 from spdx.creationinfo import Tool as SPDXTool
 from spdx.document import Document, License
@@ -77,46 +79,42 @@ class SBOMGenerator:
         """
         for dep in deps:
             # Create component
-            component = Component(
+            component = self._create_component(
                 name=dep.name,
                 version=dep.version,
-                purl=self.package_manager.create_purl(dep, pm_type)
+                type=dep.type
             )
             
             # Add sub-dependencies as dependencies
             for sub_dep in dep.dependencies:
-                component.dependencies.append(Component(
+                component.dependencies.append(self._create_component(
                     name=sub_dep.name,
                     version=sub_dep.version,
-                    purl=self.package_manager.create_purl(sub_dep, pm_type)
+                    type=sub_dep.type
                 ))
                 
             self.components.append(component)
         
-    def generate_cyclonedx(self) -> str:
-        """Generate CycloneDX SBOM.
-        
-        Returns:
-            str: CycloneDX SBOM in XML format
-        """
+    def generate_sbom(self) -> str:
+        """Generate SBOM document using latest library conventions"""
         bom = Bom()
-        
-        # Add metadata
-        bom.metadata = BomMetadata()
-        bom.metadata.tools = [
-            Tool(
-                vendor="SBOMbardier",
-                name="SBOMbardier SBOM Generator",
-                version="0.1.0"
-            )
-        ]
+        bom.metadata.component = Component(
+            name=self.project_path.name,
+            version="0.0.0",  # Should get actual version
+            type="application"
+        )
         
         # Add components
-        bom.components = self.components
+        for component in self.components:
+            bom.components.add(component)
+            
+        # Get appropriate output format
+        output = get_instance(
+            bom=bom,
+            output_format=OutputFormat.JSON if self.format == SBOMFormat.CYCLONEDX else OutputFormat.XML
+        )
         
-        # Generate XML
-        output = get_cyclonedx_output("xml")
-        return output.output_as_string(bom)
+        return output.output_as_string()
         
     def generate_spdx(self) -> Document:
         """Generate SPDX SBOM.
@@ -162,7 +160,7 @@ class SBOMGenerator:
         self.scan_dependencies()
         
         if self.format == SBOMFormat.CYCLONEDX:
-            return self.generate_cyclonedx()
+            return self.generate_sbom()
         else:
             return self.generate_spdx()
             
@@ -185,25 +183,28 @@ class SBOMGenerator:
                       type: str = "library",
                       supplier: Optional[str] = None,
                       license_id: Optional[str] = None) -> None:
-        """Add a component to the SBOM.
-        
-        Args:
-            name: Component name
-            version: Component version
-            type: Component type
-            supplier: Component supplier
-            license_id: Component license ID
-        """
+        """Add a component to the SBOM."""
         component = Component(
             name=name,
             version=version,
-            purl=self._create_purl(name, version, type)
+            type=ComponentType.LIBRARY,
+            licenses=[LicenseChoice(license=License(id=license_id))] if license_id else None,
+            supplier=OrganizationalEntity(name=supplier) if supplier else None,
+            purl=PackageURL(type=type, name=name, version=version)
         )
-        
-        if supplier:
-            component.supplier = supplier
+        self.components.append(component)
+
+    def _create_component(self, name: str, version: str, type: str) -> Component:
+        """Create a CycloneDX component with proper license handling"""
+        licenses = []
+        if self.license_id:
+            licenses.append(LicenseChoice(license=License(id=self.license_id)))
             
-        if license_id:
-            component.licenses = [License.from_identifier(license_id)]
-            
-        self.components.append(component) 
+        return Component(
+            name=name,
+            version=version,
+            type=ComponentType.LIBRARY,
+            licenses=licenses,
+            supplier=OrganizationalEntity(name=self.supplier) if self.supplier else None,
+            purl=self.purl
+        ) 
