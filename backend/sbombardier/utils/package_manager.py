@@ -143,7 +143,7 @@ class PackageManagerResolver:
             raise RuntimeError(f"Failed to resolve npm dependencies: {e.stderr}")
             
     def _resolve_maven_dependencies(self) -> List[DependencyInfo]:
-    """Resolve Maven dependencies using proper DOT parsing."""
+        """Resolve Maven dependencies using proper DOT parsing."""
         try:
             # Generate dependency tree
             deps_file = self.project_path / "deps.txt"
