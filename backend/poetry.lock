@@ -7094,4 +7094,4 @@ ml = ["dgl", "giskard", "graphviz", "numpy", "nvdlib", "openai", "osv", "pandas"
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.10"
-content-hash = "788a897583af3bcc541ea243368b48a5afe594888544551245f40939487b651a"
+content-hash = "246184b20cd47763da9a0f4fcf103fb1f9741959926c55cdcac26592dbf18189"
