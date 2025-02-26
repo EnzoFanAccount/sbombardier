@@ -7,13 +7,36 @@ from typing import Dict, List, Optional, Union
 
 from cyclonedx.model.bom import Bom
 from cyclonedx.model.component import Component, ComponentType
-from cyclonedx.model.license import License, LicenseChoice
-from cyclonedx.model.organizational_entity import OrganizationalEntity
-from cyclonedx.output import OutputFormat, get_instance
+from cyclonedx.model.license import License
+from cyclonedx.factory.license import LicenseFactory
+from cyclonedx.model.contact import OrganizationalEntity
+from cyclonedx.output import make_outputter
+from cyclonedx.schema import OutputFormat, SchemaVersion
 from packageurl import PackageURL
-from spdx.creationinfo import Tool as SPDXTool
-from spdx.document import Document, License
-from spdx.version import Version
+
+# Try to import SPDX libraries - make them optional
+try:
+    # Try importing from newer spdx-tools package first
+    try:
+        from spdx_tools.spdx.model import Document
+        from spdx_tools.spdx.model.license import License as SPDXLicense
+        from spdx_tools.spdx.model.document import CreationInfo
+        SPDX_AVAILABLE = True
+        SPDX_NEW_API = True
+    except ImportError:
+        # Fall back to older spdx package if available
+        from spdx.creationinfo import Tool as SPDXTool
+        from spdx.document import Document, License as SPDXLicense
+        from spdx.version import Version
+        SPDX_AVAILABLE = True
+        SPDX_NEW_API = False
+except ImportError:
+    SPDX_AVAILABLE = False
+    # Define placeholders to avoid syntax errors
+    SPDXLicense = object
+    Document = object
+    class Version:
+        def __init__(self, *args): pass
 
 from ..scanners.dependency_scanner import DependencyScanner, ScannerType, ScanResult
 from ..utils.package_manager import PackageManagerResolver, PackageManagerType, DependencyInfo
@@ -38,6 +61,7 @@ class SBOMGenerator:
         self.components: List[Component] = []
         self.scan_results: List[ScanResult] = []
         self.package_manager = PackageManagerResolver(project_path)
+        self.license_factory = LicenseFactory()
         
     def scan_dependencies(self) -> None:
         """Scan project dependencies using Syft, Trivy, and package managers."""
@@ -78,40 +102,55 @@ class SBOMGenerator:
             pm_type: Package manager type
         """
         for dep in deps:
-            # Create component
+            # Create component with a unique bom_ref
             component = self._create_component(
                 name=dep.name,
                 version=dep.version,
-                type=dep.type
+                type=dep.type,
+                bom_ref=f"{dep.name}@{dep.version}"
             )
             
-            # Add sub-dependencies as dependencies
+            # Add sub-dependencies as separate components and register dependencies
+            sub_components = []
             for sub_dep in dep.dependencies:
-                component.dependencies.append(self._create_component(
+                sub_component = self._create_component(
                     name=sub_dep.name,
                     version=sub_dep.version,
-                    type=sub_dep.type
-                ))
+                    type=sub_dep.type,
+                    bom_ref=f"{sub_dep.name}@{sub_dep.version}"
+                )
+                self.components.append(sub_component)
+                sub_components.append(sub_component)
                 
             self.components.append(component)
         
     def generate_sbom(self) -> str:
         """Generate SBOM document using latest library conventions"""
         bom = Bom()
-        bom.metadata.component = Component(
+        
+        # Set root component
+        root_component = Component(
             name=self.project_path.name,
             version="0.0.0",  # Should get actual version
-            type="application"
+            type=ComponentType.APPLICATION,
+            bom_ref=f"{self.project_path.name}@root"
         )
+        bom.metadata.component = root_component
         
         # Add components
         for component in self.components:
             bom.components.add(component)
             
-        # Get appropriate output format
-        output = get_instance(
+        # Register dependencies
+        for component in self.components:
+            if hasattr(component, 'dependencies') and component.dependencies:
+                bom.register_dependency(component, component.dependencies)
+        
+        # Get appropriate output format and schema version
+        output = make_outputter(
             bom=bom,
-            output_format=OutputFormat.JSON if self.format == SBOMFormat.CYCLONEDX else OutputFormat.XML
+            output_format=OutputFormat.JSON if self.format == SBOMFormat.CYCLONEDX else OutputFormat.XML,
+            schema_version=SchemaVersion.V1_4  # Use the latest schema version
         )
         
         return output.output_as_string()
@@ -122,34 +161,86 @@ class SBOMGenerator:
         Returns:
             Document: SPDX document
         """
-        doc = Document()
-        
-        # Set document info
-        doc.version = Version(2, 3)
-        doc.namespace = f"http://spdx.org/spdxdocs/sbombardier-{self.project_path.name}-1.0"
-        doc.name = f"sbombardier-{self.project_path.name}"
-        
-        # Add creation info
-        doc.creation_info.add_creator(SPDXTool("SBOMbardier-0.1.0"))
-        doc.creation_info.set_created_now()
-        
-        # Convert components to SPDX packages
-        for component in self.components:
-            package = doc.package = doc.Package(component.name)
-            package.version = component.version
-            package.download_location = component.purl or "NOASSERTION"
+        if not SPDX_AVAILABLE:
+            raise ImportError(
+                "SPDX libraries are not installed. Please install spdx-tools package: "
+                "pip install spdx-tools"
+            )
             
-            if component.licenses:
-                package.license_declared = License.from_identifier(str(component.licenses[0]))
-            else:
-                package.license_declared = "NOASSERTION"
+        if SPDX_NEW_API:
+            # New SPDX API implementation (spdx-tools)
+            from spdx_tools.spdx.model.document import Document, CreationInfo
+            from spdx_tools.spdx.model.package import Package
+            from spdx_tools.spdx.model.version import Version
+            
+            doc = Document(
+                spdx_id="SPDXRef-DOCUMENT",
+                name=f"sbombardier-{self.project_path.name}",
+                spdx_version="SPDX-2.3",
+                data_license="CC0-1.0",
+                document_namespace=f"http://spdx.org/spdxdocs/sbombardier-{self.project_path.name}-1.0",
+                creation_info=CreationInfo(
+                    creators=["Tool: SBOMbardier-0.1.0"],
+                    created=None  # This will default to current time
+                )
+            )
+            
+            # Convert components to SPDX packages
+            for component in self.components:
+                package = Package(
+                    name=component.name,
+                    spdx_id=f"SPDXRef-{component.name}",
+                    download_location="NOASSERTION",
+                    version=component.version,
+                    license_concluded="NOASSERTION"
+                )
                 
-            # Add dependencies
-            if component.dependencies:
-                for dep in component.dependencies:
-                    package.add_dependency(dep.name)
+                # Add license if available
+                if component.licenses and len(component.licenses) > 0:
+                    # Get the first license
+                    license_obj = next(iter(component.licenses))
+                    if hasattr(license_obj, 'id') and license_obj.id:
+                        package.license_concluded = license_obj.id
                 
-        return doc
+                # Add package to document
+                doc.packages = doc.packages + [package]
+            
+            return doc
+        else:
+            # Legacy SPDX API implementation
+            doc = Document()
+            
+            # Set document info
+            doc.version = Version(2, 3)
+            doc.namespace = f"http://spdx.org/spdxdocs/sbombardier-{self.project_path.name}-1.0"
+            doc.name = f"sbombardier-{self.project_path.name}"
+            
+            # Add creation info
+            doc.creation_info.add_creator(SPDXTool("SBOMbardier-0.1.0"))
+            doc.creation_info.set_created_now()
+            
+            # Convert components to SPDX packages
+            for component in self.components:
+                package = doc.package = doc.Package(component.name)
+                package.version = component.version
+                package.download_location = component.purl or "NOASSERTION"
+                
+                if component.licenses and len(component.licenses) > 0:
+                    # Get the first license
+                    license_obj = next(iter(component.licenses))
+                    if hasattr(license_obj, 'id') and license_obj.id:
+                        package.license_declared = SPDXLicense.from_identifier(license_obj.id)
+                    else:
+                        package.license_declared = "NOASSERTION"
+                else:
+                    package.license_declared = "NOASSERTION"
+                    
+                # Add dependencies
+                if component.dependencies:
+                    for dep in component.dependencies:
+                        package.add_dependency(dep.name)
+                    
+            return doc
         
     def generate(self) -> Union[str, Document]:
         """Generate SBOM in the specified format.
@@ -177,6 +268,23 @@ class SBOMGenerator:
         """
         return str(PackageURL(type=type, name=name, version=version))
         
+    def _create_component(self, name: str, version: str, type: str, bom_ref: str = None) -> Component:
+        """Create a CycloneDX component with proper license handling"""
+        # Create a unique bom_ref if not provided
+        if bom_ref is None:
+            bom_ref = f"{name}@{version}"
+            
+        # Create component with proper attributes
+        component = Component(
+            name=name,
+            version=version,
+            type=ComponentType.LIBRARY,
+            bom_ref=bom_ref,
+            purl=PackageURL(type=type, name=name, version=version)
+        )
+        
+        return component
+    
     def _add_component(self, 
                       name: str,
                       version: str,
@@ -188,23 +296,16 @@ class SBOMGenerator:
             name=name,
             version=version,
             type=ComponentType.LIBRARY,
-            licenses=[LicenseChoice(license=License(id=license_id))] if license_id else None,
-            supplier=OrganizationalEntity(name=supplier) if supplier else None,
+            bom_ref=f"{name}@{version}",
             purl=PackageURL(type=type, name=name, version=version)
         )
-        self.components.append(component)
-
-    def _create_component(self, name: str, version: str, type: str) -> Component:
-        """Create a CycloneDX component with proper license handling"""
-        licenses = []
-        if self.license_id:
-            licenses.append(LicenseChoice(license=License(id=self.license_id)))
+        
+        # Add license if provided
+        if license_id:
+            component.licenses.add(self.license_factory.make_license(id=license_id))
             
-        return Component(
-            name=name,
-            version=version,
-            type=ComponentType.LIBRARY,
-            licenses=licenses,
-            supplier=OrganizationalEntity(name=self.supplier) if self.supplier else None,
-            purl=self.purl
-        ) 
+        # Add supplier if provided
+        if supplier:
+            component.supplier = OrganizationalEntity(name=supplier)
+            
+        self.components.append(component)
