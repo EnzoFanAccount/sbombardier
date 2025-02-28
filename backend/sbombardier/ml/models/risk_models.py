@@ -8,11 +8,38 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
-import dgl
-import numpy as np
-import torch
+# Check PyTorch version before importing DGL
+try:
+    import torch
+    torch_version = torch.__version__
+    major, minor = map(int, torch_version.split(".")[:2])
+    
+    # Only attempt to import DGL if PyTorch version is compatible
+    try:
+        import dgl
+        DGL_AVAILABLE = True
+    except ImportError as e:
+        dgl = None
+        DGL_AVAILABLE = False
+        print(f"WARNING: DGL import failed in risk_models.py: {e}")
+        print("Graph neural network features will be disabled.")
+        print("To enable full functionality, ensure PyTorch and DGL versions are compatible.")
+    except FileNotFoundError as e:
+        dgl = None
+        DGL_AVAILABLE = False
+        print(f"WARNING: DGL library files not found in risk_models.py: {e}")
+        print(f"Current PyTorch version: {torch_version}")
+        print("Graph neural network features will be disabled.")
+        print("To enable full functionality, install compatible DGL version for your PyTorch.")
+except ImportError:
+    torch = None
+    dgl = None
+    DGL_AVAILABLE = False
+    print("WARNING: PyTorch not found. Graph neural network features will be disabled.")
+
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 from transformers import (AutoModelForSequenceClassification, AutoTokenizer,
                        DistilBertForSequenceClassification, DistilBertTokenizer)
 
@@ -102,6 +129,12 @@ class DependencyGNN(nn.Module):
             hidden_size: Hidden layer size
         """
         super().__init__()
+
+        if not DGL_AVAILABLE:
+            raise ImportError(
+                "DGL is required for DependencyGNN but not available. "
+                "Ensure PyTorch and DGL versions are compatible."
+            )
         
         self.layers = nn.ModuleList([
             dgl.nn.GraphConv(in_feats, hidden_size),
@@ -243,7 +276,17 @@ class HybridRiskPredictor:
     def __init__(self):
         """Initialize hybrid risk predictor."""
         self.llm = LicenseRiskLLM()
-        self.gnn = DependencyGNN(in_feats=64)  # Adjust feature size as needed
+
+        # Only initialize GNN if DGL is available
+        if DGL_AVAILABLE:
+            try:
+                self.gnn = DependencyGNN(in_feats=64)  # Adjust feature size as needed
+            except Exception as e:
+                print(f"Warning: Could not initialize DependencyGNN: {e}")
+                self.gnn = None
+        else:
+            self.gnn = None
+
         self.cnn = VulnerabilityIVulCNN()
         
     def predict(self,
@@ -260,30 +303,37 @@ class HybridRiskPredictor:
         Returns:
             RiskPrediction: Combined risk prediction
         """
+        # Initialize predictors
         predictions = []
-        weights = []
-        
+        risk_factors = []
+
+        # Get LLM prediction for license
         if license_text:
             llm_pred = self.llm(license_text)
-            predictions.append(llm_pred)
-            weights.append(0.4)  # Weight for license risks
+            predictions.append(llm_pred.risk_score)
+            risk_factors.extend(llm_pred.risk_factors)
             
-        if dependency_graph is not None:
-            gnn_pred = self.gnn(dependency_graph, dependency_graph.ndata["feat"])
-            predictions.append(gnn_pred)
-            weights.append(0.3)  # Weight for dependency risks
+        if dependency_graph and self.gnn is not None and DGL_AVAILABLE:
+            try:
+                if isinstance(dependency_graph, dgl.DGLGraph):
+                    features = torch.randn(dependency_graph.number_of_nodes(), 64)
+                    gnn_pred = self.gnn(dependency_graph, features)
+                    predictions.append(gnn_pred.risk_score)
+                    risk_factors.extend(gnn_pred.risk_factors)
+            except Exception as e:
+                print(f"Warning: GNN prediction failed: {e}")
             
         if code_image is not None:
             cnn_pred = self.cnn(code_image)
-            predictions.append(cnn_pred)
-            weights.append(0.3)  # Weight for vulnerability risks
+            predictions.append(cnn_pred.risk_score)
+            risk_factors.extend(cnn_pred.risk_factors)
             
         if not predictions:
             raise ValueError("No inputs provided for prediction")
             
         # Combine predictions
-        weights = np.array(weights) / sum(weights)
-        combined_score = sum(p.risk_score * w for p, w in zip(predictions, weights))
+        weights = np.array([0.33, 0.33, 0.33])  # Equal weights for simplicity
+        combined_score = sum(p * w for p, w in zip(predictions, weights))
         combined_confidence = sum(p.confidence * w for p, w in zip(predictions, weights))
         
         # Combine risk factors

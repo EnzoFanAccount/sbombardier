@@ -7,11 +7,39 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Union
+import sys
 
-import dgl
+# Check PyTorch version before importing DGL
+try:
+    import torch
+    torch_version = torch.__version__
+    major, minor = map(int, torch_version.split(".")[:2])
+    
+    # Only attempt to import DGL if PyTorch version is compatible
+    try:
+        import dgl
+        DGL_AVAILABLE = True
+    except ImportError as e:
+        dgl = None
+        DGL_AVAILABLE = False
+        print(f"WARNING: DGL import failed: {e}")
+        print("Graph neural network features will be disabled.")
+        print("To enable full functionality, ensure PyTorch and DGL versions are compatible.")
+    except FileNotFoundError as e:
+        dgl = None
+        DGL_AVAILABLE = False
+        print(f"WARNING: DGL library files not found: {e}")
+        print(f"Current PyTorch version: {torch_version}")
+        print("Graph neural network features will be disabled.")
+        print("To enable full functionality, install compatible DGL version for your PyTorch.")
+except ImportError:
+    torch = None
+    dgl = None
+    DGL_AVAILABLE = False
+    print("WARNING: PyTorch not found. Graph neural network features will be disabled.")
+
 import numpy as np
 import redis
-import torch
 from giskard import Model, ModelValidator
 from trustyai.model import ModelAnalyzer
 import networkx as nx
@@ -224,101 +252,108 @@ class RiskPredictor:
         Returns:
             dgl.DGLGraph: Dependency graph representing package dependencies
         """
-        # Create NetworkX graph for initial construction
-        G = nx.DiGraph()
-        
-        def add_dependencies(pkg_name: str, pkg_version: str, depth: int = 0):
-            if depth > 5:  # Limit depth to prevent infinite recursion
-                return
+        if not DGL_AVAILABLE:
+            return None
             
-            # Add current package as node
-            node_id = f"{pkg_name}@{pkg_version}"
-            if node_id not in G.nodes:
-                G.add_node(node_id, 
-                          name=pkg_name,
-                          version=pkg_version,
-                          depth=depth)
+        try:
+            # Create NetworkX graph for initial construction
+            G = nx.DiGraph()
             
-            try:
-                # Get package dependencies
-                deps = self._get_package_dependencies(pkg_name, pkg_version)
+            def add_dependencies(pkg_name: str, pkg_version: str, depth: int = 0):
+                if depth > 3:  # Limit depth to prevent infinite recursion
+                    return
                 
-                # Add edges for each dependency
-                for dep_name, dep_spec in deps.items():
-                    try:
-                        # Get best matching version for dependency
-                        dep_version = self._resolve_version(dep_name, dep_spec)
-                        dep_id = f"{dep_name}@{dep_version}"
-                        
-                        # Add edge
-                        G.add_edge(node_id, dep_id, 
-                                 requirement=str(dep_spec))
-                        
-                        # Recursively add dependencies
-                        add_dependencies(dep_name, dep_version, depth + 1)
-                    except Exception as e:
-                        # Log error but continue with other dependencies
-                        print(f"Error adding dependency {dep_name}: {e}")
-                        
-            except Exception as e:
-                print(f"Error getting dependencies for {pkg_name}: {e}")
-        
-        # Start graph construction from root package
-        add_dependencies(name, version)
-        
-        # Convert NetworkX graph to DGL
-        dgl_graph = dgl.from_networkx(G, 
-            node_attrs=['name', 'version', 'depth'],
-            edge_attrs=['requirement'])
-        
-        # Add node features
-        num_nodes = dgl_graph.num_nodes()
-        
-        # Node feature vector components:
-        # [0-31]: Name embedding (hashed)
-        # [32-47]: Version embedding
-        # [48-55]: Depth encoding
-        # [56-63]: Degree features
-        node_features = torch.zeros((num_nodes, 64))
-        
-        for i, (name, version, depth) in enumerate(zip(
-            dgl_graph.ndata['name'],
-            dgl_graph.ndata['version'],
-            dgl_graph.ndata['depth']
-        )):
-            # Hash package name into 32-dim vector
-            name_hash = hash(name) % (2**32)
-            for j in range(32):
-                node_features[i,j] = (name_hash >> j) & 1
+                # Add current package as node
+                node_id = f"{pkg_name}@{pkg_version}"
+                if node_id not in G.nodes:
+                    G.add_node(node_id, 
+                              name=pkg_name,
+                              version=pkg_version,
+                              depth=depth)
+                
+                try:
+                    # Get package dependencies
+                    deps = self._get_package_dependencies(pkg_name, pkg_version)
+                    
+                    # Add edges for each dependency
+                    for dep_name, dep_spec in deps.items():
+                        try:
+                            # Get best matching version for dependency
+                            dep_version = self._resolve_version(dep_name, dep_spec)
+                            dep_id = f"{dep_name}@{dep_version}"
+                            
+                            # Add edge
+                            G.add_edge(node_id, dep_id, 
+                                     requirement=str(dep_spec))
+                            
+                            # Recursively add dependencies
+                            add_dependencies(dep_name, dep_version, depth + 1)
+                        except Exception as e:
+                            # Log error but continue with other dependencies
+                            print(f"Error adding dependency {dep_name}: {e}")
+                            
+                except Exception as e:
+                    print(f"Error getting dependencies for {pkg_name}: {e}")
             
-            # Encode version into 16-dim vector
-            try:
-                v = parse_version(version)
-                node_features[i,32:40] = torch.tensor([
-                    v.major if hasattr(v, 'major') else 0,
-                    v.minor if hasattr(v, 'minor') else 0,
-                    v.micro if hasattr(v, 'micro') else 0,
-                    v.pre[1] if v.pre else 0,
-                    v.post[1] if v.post else 0,
-                    v.dev[1] if v.dev else 0,
-                    v.local[0] if v.local else 0,
-                    1 if v.is_prerelease else 0
-                ]) / 100.0  # Normalize
-            except:
-                pass
+            # Start graph construction from root package
+            add_dependencies(name, version)
             
-            # Encode depth
-            node_features[i,48:56] = torch.tensor([depth]) / 5.0
+            # Convert NetworkX graph to DGL
+            dgl_graph = dgl.from_networkx(G, 
+                node_attrs=['name', 'version', 'depth'],
+                edge_attrs=['requirement'])
             
-            # Add degree features
-            in_deg = dgl_graph.in_degrees(i).float()
-            out_deg = dgl_graph.out_degrees(i).float()
-            node_features[i,56:60] = in_deg / 10.0  # Normalize
-            node_features[i,60:64] = out_deg / 10.0
-        
-        dgl_graph.ndata['feat'] = node_features
-        
-        return dgl_graph
+            # Add node features
+            num_nodes = dgl_graph.num_nodes()
+            
+            # Node feature vector components:
+            # [0-31]: Name embedding (hashed)
+            # [32-47]: Version embedding
+            # [48-55]: Depth encoding
+            # [56-63]: Degree features
+            node_features = torch.zeros((num_nodes, 64))
+            
+            for i, (name, version, depth) in enumerate(zip(
+                dgl_graph.ndata['name'],
+                dgl_graph.ndata['version'],
+                dgl_graph.ndata['depth']
+            )):
+                # Hash package name into 32-dim vector
+                name_hash = hash(name) % (2**32)
+                for j in range(32):
+                    node_features[i,j] = (name_hash >> j) & 1
+                
+                # Encode version into 16-dim vector
+                try:
+                    v = parse_version(version)
+                    node_features[i,32:40] = torch.tensor([
+                        v.major if hasattr(v, 'major') else 0,
+                        v.minor if hasattr(v, 'minor') else 0,
+                        v.micro if hasattr(v, 'micro') else 0,
+                        v.pre[1] if v.pre else 0,
+                        v.post[1] if v.post else 0,
+                        v.dev[1] if v.dev else 0,
+                        v.local[0] if v.local else 0,
+                        1 if v.is_prerelease else 0
+                    ]) / 100.0  # Normalize
+                except:
+                    pass
+                
+                # Encode depth
+                node_features[i,48:56] = torch.tensor([depth]) / 5.0
+                
+                # Add degree features
+                in_deg = dgl_graph.in_degrees(i).float()
+                out_deg = dgl_graph.out_degrees(i).float()
+                node_features[i,56:60] = in_deg / 10.0  # Normalize
+                node_features[i,60:64] = out_deg / 10.0
+            
+            dgl_graph.ndata['feat'] = node_features
+            
+            return dgl_graph
+        except Exception as e:
+            print(f"Warning: Failed to build dependency graph: {e}")
+            return None
 
     def _get_package_dependencies(self, name: str, version: str) -> Dict[str, SpecifierSet]:
         """Get dependencies for a package version.

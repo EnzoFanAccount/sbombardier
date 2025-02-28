@@ -16,6 +16,7 @@ We're currently focusing on:
 3. General testing and usage feedback
 4. Documentation improvements
 5. Policy rule contributions for different compliance frameworks
+6. DGL and PyTorch installation
 
 ### Reporting Bugs
 
@@ -64,11 +65,22 @@ poetry install --extras "ml compliance"  # Install all dependencies for developm
 poetry shell
 ```
 
-2. Install external tools:
+2. ML Dependencies (important for ML feature development): The ML features in SBOMbardier depend on PyTorch and DGL (Deep Graph Library), which require specific version compatibility:
+```bash
+# Use our helper script to install compatible ML dependencies
+python install_ml_deps.py
+```
+This script installs PyTorch 2.0.1 and DGL 1.1.2, which are tested and known to work well together, especially on Windows platforms. Important ML Development Notes:
+* ML features are designed to gracefully degrade if dependencies are missing
+* Always test your code with and without ML dependencies available
+* Check conditional imports in ```risk/predictor.py``` and ```ml/models/risk_models.py```
+* When adding new ML features, ensure they have fallback mechanisms
+
+3. Install external tools:
 - [Syft](https://github.com/anchore/syft#installation)
 - [Trivy](https://aquasecurity.github.io/trivy/latest/getting-started/installation/)
 
-3. Run tests:
+4. Run tests:
 ```bash
 poetry run pytest
 ```
@@ -120,6 +132,28 @@ sbombardier/
 - Use functional components with hooks
 - Use TypeScript types/interfaces
 - Follow project's component structure
+
+## Cross-Platform Compatibility
+
+SBOMbardier aims to work across Windows, macOS, and Linux platforms. When contributing, please keep these considerations in mind:
+
+### Dependencies
+- Some ML libraries have platform-specific compatibility requirements
+- Always test your code on multiple platforms when possible
+- For Windows compatibility:
+  - Prefer pinned versions of PyTorch (2.0.1) and DGL (1.1.2)
+  - Make sure TensorFlow dependencies use the supported version (2.10.0)
+
+### Conditional Imports
+- Use try/except blocks for optional dependencies
+- Include helpful error messages when a library isn't available
+- Implement graceful fallbacks for all ML-dependent features
+- Test both with and without all optional dependencies installed
+
+### File Paths
+- Use `pathlib.Path` for cross-platform path handling instead of string manipulation
+- Avoid hardcoded path separators (e.g., use `Path.joinpath()` instead of `path + '/'`)
+- Consider case sensitivity differences between platforms
 
 ## Testing
 

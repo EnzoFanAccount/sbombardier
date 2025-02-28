@@ -46,7 +46,12 @@ class RiskPredictionRequest(BaseModel):
     repo_url: Optional[str] = None
 
 # Initialize services
-risk_predictor = RiskPredictor()
+try:
+    risk_predictor = RiskPredictor(use_ml=True)
+except Exception as e:
+    print(f"Warning: Could not initialize RiskPredictor with ML features: {e}")
+    print("Falling back to non-ML risk prediction")
+    risk_predictor = RiskPredictor(use_ml=False)
 
 @app.post("/generate", response_model=Dict[str, Union[str, List[str]]])
 async def generate_sbom(request: GenerateRequest):

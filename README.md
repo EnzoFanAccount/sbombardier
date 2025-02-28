@@ -98,6 +98,33 @@ poetry install --extras compliance
 # Install all optional dependencies
 poetry install --extras "ml compliance"
 ```
+### ML Dependency Installation
+
+SBOMbardier uses PyTorch and DGL (Deep Graph Library) for its ML features. These libraries require specific version compatibility, especially on Windows.
+
+#### Option 1: Using the Provided Script(Recommended)
+
+We provide a helper script compatible versions of PyTorch and DGL:
+```bash
+cd backend
+python install_ml_deps.py
+```
+
+#### Option 2: Manual Installation
+
+If you prefer to install the dependences manually:
+```bash
+# Uninstall existing packages first
+pip uninstall -y torch torchvision torchaudio dgl
+
+# For Windows (CPU only)
+pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cpu
+pip install dgl==1.1.2 -f https://data.dgl.ai/wheels/repo.html
+
+# For Linux/Mac
+pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2
+pip install dgl==1.1.2
+```
 ### Windows-specific Additional Step
 ```bash
 poetry run pip install tensorflow==2.10.0
@@ -265,3 +292,4 @@ AGPL-3.0 - See [LICENSE](LICENSE) for details
 > - Model performance concerns
 > - Errors
 > - Policy rule suggestions
+> - DGL installation issues
