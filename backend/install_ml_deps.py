@@ -20,10 +20,10 @@ def install_ml_dependencies():
     
     if system == "windows":
         # For Windows, use CPU-only versions for simplicity
-        print("Installing PyTorch 2.0.1 (CPU version)")
+        print("Installing PyTorch 2.2.0 (CPU version)")
         subprocess.run([
             sys.executable, "-m", "pip", "install", 
-            "torch==2.0.1", "torchvision==0.15.2", "torchaudio==2.0.2", 
+            "torch==2.2.0", "torchvision==0.17.0", "torchaudio==2.2.0", 
             "--index-url", "https://download.pytorch.org/whl/cpu"
         ])
         
@@ -34,10 +34,10 @@ def install_ml_dependencies():
         ])
     else:
         # For Linux/Mac, use standard packages without CUDA
-        print("Installing PyTorch 2.0.1")
+        print("Installing PyTorch 2.2.0")
         subprocess.run([
             sys.executable, "-m", "pip", "install", 
-            "torch==2.0.1", "torchvision==0.15.2", "torchaudio==2.0.2"
+            "torch==2.2.0", "torchvision==0.17.0", "torchaudio==2.2.0"
         ])
         
         print("Installing DGL 1.1.2")
