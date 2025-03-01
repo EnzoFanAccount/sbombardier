@@ -24,6 +24,7 @@ aiofiles = "^23.2.1"
 python-dotenv = "^1.0.0"
 pyparsing = "^3.1.0"
 packaging = "<22.0"
+setuptools = "==70.0.0"
 
 # ML Dependencies - in optional group
 torch = {version = "==2.2.0", optional = true}  # Using a specific version known to work well with DGL on Windows
