@@ -5590,7 +5590,7 @@ description = "Easily download, build, install, upgrade, and uninstall Python pa
 optional = false
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform == \"win32\" or sys_platform != \"linux\" and sys_platform != \"darwin\" and sys_platform != \"win32\""
+markers = "(sys_platform == \"linux\" or sys_platform == \"darwin\" or sys_platform == \"win32\" or sys_platform != \"linux\" and sys_platform != \"darwin\" and sys_platform != \"win32\") and (extra == \"ml\" or extra == \"compliance\")"
 files = [
     {file = "setuptools-59.8.0-py3-none-any.whl", hash = "sha256:608a7885b664342ae9fafc43840b29d219c5a578876f6f7e00c4e2612160587f"},
     {file = "setuptools-59.8.0.tar.gz", hash = "sha256:09980778aa734c3037a47997f28d6db5ab18bdf2af0e49f719bfc53967fd2e82"},
@@ -7075,4 +7075,4 @@ ml = ["dgl", "giskard", "graphviz", "numpy", "nvdlib", "openai", "osv", "pandas"
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.10"
-content-hash = "edff5b24dfd42bd8411317731be33e9a8e561070aa419abf1663b5f5e212b364"
+content-hash = "5618d37cfed0a9e1c5483c8ccec087a0ff58e73e682a214282cbd6ec8f4c7b84"
