@@ -49,7 +49,7 @@ pygments = {version = "^2.15.0", optional = true}
 python-magic = {version = "^0.4.27", optional = true}
 
 # Compliance Dependencies - in optional group
-jinja2 = {version = "^3.1.0", optional = true}
+jinja2 = {version = "^3.1.6", optional = true}
 python-gitlab = {version = "^4.0.0", optional = true}
 PyGithub = {version = "^2.1.0", optional = true}
 opa-python = {version = "^0.0.8", optional = true}
